@@ -261,6 +261,18 @@ define
                                                                             end
                   [pB '[' plus(forExpression) forComprehension opt(seq2('do' phrase) unit) ']' pE]
                   #fun{$ [P1 _ S1 FC BD _ P2]}fListComprehension(S1 FC BD {MkPos P1 P2}) end
+                  [pB '(' plus(subtree) 'suchthat' opt(seq1(lvl0 ':') unit) lvl0 'in' lvl0 opt(seq2('if' lvl0) unit) opt(seq2('of' lvl0) unit) opt(seq2('do' phrase) unit) ')' pE]
+                  #fun{$ [P1 _ S _ F L1 _ L2 IF OF DO _ P2]}
+                      if F == unit then fRecordComprehension(S L1 L2 IF OF DO {MkPos P1 P2})
+                      else fRecordComprehension(S fColon(F L1) L2 IF OF DO {MkPos P1 P2})
+                      end
+                   end
+                  [pB '(' plus(subtree) 'suchthat' opt(seq1(lvl0 ':') unit) lvl0 'in' lvl0 'of' lvl0 'if' lvl0 opt(seq2('do' phrase) unit) ')' pE]
+                  #fun{$ [P1 _ S _ F L1 _ L2 _ OF _ IF DO _ P2]}
+                      if F == unit then fRecordComprehension(S L1 L2 IF OF DO {MkPos P1 P2})
+                      else fRecordComprehension(S fColon(F L1) L2 IF OF DO {MkPos P1 P2})
+                      end
+                   end
                   [pB 'skip' pE]#fun{$ [P1 _ P2]}fSkip({MkPos P1 P2})end
                   [pB 'fail' pE]#fun{$ [P1 _ P2]}fFail({MkPos P1 P2})end
                   [pB 'self' pE]#fun{$ [P1 _ P2]}fSelf({MkPos P1 P2})end
@@ -271,7 +283,10 @@ define
                   feature
                   escVar
                   )
-      forExpression:[subtree opt(seq2('if' lvl0) unit)]#fun{$ [S1 S2]}forExpression(S1 S2)end
+      forExpression:alt(
+                       [feature ':' atom ':' lvl0]#fun{$ [F _ A _ L]}forFeature(A fColon(F L))end
+                       [subtree opt(seq2('if' lvl0) unit)]#fun{$ [S1 S2]}forExpression(S1 S2)end
+                       )
       forComprehension:plus([pB 'suchthat' plus(forListDecl) opt(seq2('if' lvl0) unit) pE])#fun{$ Ss}
                                                                                                {FoldR Ss fun{$ Xn Y}
                                                                                                             case Xn
@@ -291,6 +306,7 @@ define
                     [lvl0 '..' lvl0 opt(seq2(';' lvl0) unit)]#fun{$ [S1 _ S2 S3]}forGeneratorInt(S1 S2 S3)end
                     ['(' forGenC ')']#fun{$ [_ S _]}S end
                     forGenC
+                    [lvl0 ':' lvl0]#fun{$ [S1 _ S2]}forGeneratorList(fBuffer(S1 S2))end
                     lvl0#fun{$ S}forGeneratorList(S)end
                     )
       forDecl:alt(

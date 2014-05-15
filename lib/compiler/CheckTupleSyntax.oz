@@ -121,7 +121,9 @@ local
       [] fListComprehension(E Fs Bd C) then {ForAll E Phrase} {ForAll Fs Phrase} {Phrase Bd} {Coord C}
       [] fForComprehensionLevel(RG CD C) then {ForDecl RG} {Phrase CD} {Coord C}
       [] forExpression(E C) then {Phrase E} {Phrase C}
+      [] fBuffer(Xs N) then {Phrase Xs} {Phrase N}
       [] forRecord(F A R Fc) then {Phrase F} {Phrase A} {Phrase R} {Phrase Fc}
+      [] fRecordComprehension(S A R F Cd Do C) then {Phrase S} {Phrase A} {Phrase R} {Phrase F} {Phrase Cd} {Phrase Do} {Coord C}
       else {FDExpression X}
       end
    end

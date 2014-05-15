@@ -25,7 +25,7 @@
 %% Explanations related to this file are in
 %% https://github.com/francoisfonteyn/thesis_public/blob/master/Thesis.pdf
 %% Complete syntax
-%% https://github.com/francoisfonteyn/thesis_public/blob/master/Syntax.pdf
+%% https://github.com/francoisfonteyn/thesis_public/blob/master/Syntax_unofficial.pdf
 
 functor
 import
@@ -117,6 +117,41 @@ define
             And
          end
       end
+      %% declare the cell and collector for a collect output
+      %% returns the name of the cell
+      fun {DeclareCollect Feat Coll}
+         Cell = {MakeVarIndex 'Cell' Feat.1}
+         Elem = {MakeVar 'Elem'}
+         Next = {MakeVar 'Next'}
+      in
+         %% add cell
+         {PushIndex 'Cell' Feat.1
+          fEq(Cell
+              fApply(fVar('NewCell' unit)
+                     [fWildcard(unit)]
+                     unit)
+              unit)}
+         %% add procedure
+         {PushIndex 'Collector' Feat.1
+          fProc(%% name
+                Coll
+                %% arguments
+                [Elem]
+                %% body
+                fLocal(%% decl
+                       Next
+                       %% body
+                       fApply(fVar('Exchange' unit)
+                              [Cell fRecord(fAtom('|' unit) [Elem Next]) Next]
+                              unit)
+                       %% position
+                       unit)
+                %% flags
+                nil
+                %% position
+                unit)}
+         Cell
+      end
       %% push to FindNextDFS in dictionary
       %% returns its name
       %% WithFun : true if proc with Fun arg, false otherwise
@@ -196,9 +231,11 @@ define
       %% - Fields:        the fields features
       %% - Expressions:   the fields values
       %% - Conditions:    the conditions
+      %% - FieldsCollect: the fields of collects --> [Feature ... Feature]
+      %% - CellsCollect:  the cells of collects --> [Cell ... Cell]
       %% --> assigns ReturnList to true iff a list must be returned and not a record
       %% --> returns the number of expressions
-      fun {ParseExpressions EXPR_LIST ?Fields ?Expressions ?Conditions}
+      fun {ParseExpressions EXPR_LIST ?Fields ?Expressions ?Conditions ?FieldsCollect ?CellsCollect}
          %% inserts I inside List, keeping it sorted
          %% no duplicates are in this list before and after
          %% List : sorted List of Ints
@@ -231,6 +268,8 @@ define
                else
                   {CreateIntIndexList T Acc}
                end
+            [] forFeature(_ _)|T then
+               {CreateIntIndexList T Acc}
             end
          end
          %% List : a sorted list of Ints
@@ -269,26 +308,35 @@ define
             end
          end
          %% Body of ParseExpressions
-         fun {Aux List Fs Es Cs Li I N}
+         fun {Aux List Fs Es Cs FCs CCs Li I N}
             case List
             of nil then
                Fields = Fs
                Expressions = Es
                Conditions = Cs
+               FieldsCollect = FCs
+               CellsCollect = CCs
                ReturnList = N == 1 andthen {Label EXPR_LIST.1.1} \= fColon andthen {Label EXPR_LIST.1} \= forFeature
                N
             [] forExpression(Colon C)|T then
                case Colon of fColon(F E) then
-                  {Aux T F|Fs E|Es C|Cs Li I N+1}
+                  {Aux T F|Fs E|Es C|Cs FCs CCs Li I N+1}
                else L W in
                   L#W = {FindNextInt Li I}
-                  {Aux T fInt(W unit)|Fs Colon|Es C|Cs L W+1 N+1}
+                  {Aux T fInt(W unit)|Fs Colon|Es C|Cs FCs CCs L W+1 N+1}
+               end
+            [] forFeature(C fColon(Feat Coll))|T then
+               case C of fAtom(collect _) then Cell in
+                  Cell = {DeclareCollect Feat Coll}
+                  {Aux T Fs Es Cs Feat|FCs Cell|CCs Li I N+1}
+               else
+                  {Exception.raiseError 'list comprehension'(unknownFeature(C))} unit
                end
             end
          end
          Li = {CreateIntIndexList EXPR_LIST nil}
       in
-         {Aux EXPR_LIST nil nil nil Li 1 0}
+         {Aux EXPR_LIST nil nil nil nil nil Li 1 0}
       end
       %% same as List.map but with more lists
       %% 4 lists as input
@@ -309,18 +357,24 @@ define
       %% returns [fVar('Next1' unit) ... fVar('NextN' unit)]
       %% NextsRecord is bound to the same list but with
       %%    each element put inside a fColon with its feature
-      fun {CreateNexts Outputs Fields ?NextsRecord}
-         fun {Aux I Fs Acc1 Acc2}
+      fun {CreateNexts Outputs Fields FieldsCollect CellsCollect ?NextsRecord}
+         fun {Aux I Fs FCs CCs Acc1 Acc2}
             if I == 0 then
                NextsRecord = Acc2
                Acc1
-            else Var in
-               Var = {MakeVarIndex 'Next' I}
-               {Aux I-1 Fs.2 Var|Acc1 fColon(Fs.1 Var)|Acc2}
+            else
+               if Fs == nil then
+                  %% collect
+                  {Aux I-1 Fs FCs.2 CCs.2 Acc1 fColon(FCs.1 fAt(CCs.1 unit))|Acc2}
+               else Var in
+                  %% "normal output"
+                  Var = {MakeVarIndex 'Next' I}
+                  {Aux I-1 Fs.2 FCs CCs Var|Acc1 fColon(Fs.1 Var)|Acc2}
+               end
             end
          end
       in
-         {Aux Outputs Fields nil nil}
+         {Aux Outputs Fields FieldsCollect CellsCollect nil nil}
       end
       %% creates a list with all the outputs
       %% returns [fVar('Next1' unit) ... fVar('NextN' unit)]
@@ -384,7 +438,22 @@ define
                [] forPattern(_ F) then
                   case F
                   of forGeneratorInt(L _ _) then {Aux T L|Acc Dcl I+1} % for I in L..H ; S
-                  [] forGeneratorList(L)    then {Aux T L|Acc Dcl I+1} % for I in L
+                  [] forGeneratorList(L)    then
+                     case L
+                     of fBuffer(LL N) then End Thread Range Eq in  % for I in LL:N
+                        End = {MakeVarIndexIndex 'End' I 'At' Index+1}
+                        Range = {MakeVarIndexIndex 'Range' I 'At' Index+1}
+                        Eq = fEq(Range LL unit)
+                        Thread = fEq(End
+                                     fThread(fApply(fOpApply('.' [fVar('List' unit) fAtom(drop unit)] unit)
+                                                    [Range N]
+                                                    unit)
+                                             {CoordNoDebug COORDS})
+                                     unit)
+                        {Aux T fRecord(fAtom('#' unit) [Range End])|Acc Eq|Thread|Dcl I+1}
+                     else % for I in (L orelse [...])
+                        {Aux T L|Acc Dcl I+1}
+                     end
                   [] forGeneratorC(B _ _)   then {Aux T B|Acc Dcl I+1} % for I in B ; C ; S
                   end
                end
@@ -404,8 +473,8 @@ define
       %% NewExtraArgsForLists : returns all the ranges of this level generated as list
       %% RangesDeclCallNext   : all the ranges to call (with transformation for next iteration already included) of this level
       %% RangesConditionList  : the list of all conditions to fullfill to keep iterating this level
-      %% --> for   I1 in R1   A in 1..2   I2 in R3   B in 1;B+1   C in 1..3   lazy
-      %% returns              : [fVar(C unit)  fVar(B unit)  fVar(Range3At1 unit)  fVar(A unit)  fVar(Range1At1 unit)]
+      %% --> for   I1 in R1:2   A in 1..2   I2 in R3   B in 1;B+1   C in 1..3   lazy
+      %% returns              : [fVar(C unit)  fVar(B unit)  fVar(Range3At1 unit)  fVar(A unit)  fVar(Range1At1 unit)#fVar(End1At1 unit)]
       %% Lazy                 : true
       %% RangesDeeper         : [fVar(C unit)  fVar(B unit)  fVar(I3 unit)  fVar(A unit)  fVar(I1 unit)]
       %% RangeListDecl        : fAnd(fEq(fVar(I2 pos) fVar(Range3AtX.1 unit) unit)   fEq(fVar(I1 pos) fVar(Range1AtX.1 unit) unit))
@@ -437,7 +506,7 @@ define
                case H
                of forPattern(V P) then
                   case P
-                  of forGeneratorList(_) then Both Var Dcl Call Cond in % list given
+                  of forGeneratorList(GL) then Both Var Dcl Call Cond in % list given
                      %% create new variable to deal with list traversal (recursively)
                      Var = {MakeVarIndexIndex 'Range' I 'At' Index}
                      Cond = fOpApply('\\='
@@ -446,10 +515,27 @@ define
                      Dcl = fEq(V
                                fOpApply('.' [Var fInt(1 unit)] unit)
                                unit)
-                     Both = Var
-                     Call = fOpApply('.'
-                                     [Var fInt(2 unit)]
-                                     unit)
+                     if {Record.label GL} == fBuffer then End in
+                        %% we need a buffer
+                        End = {MakeVarIndexIndex 'End' I 'At' Index}
+                        Call = fRecord(fAtom('#' unit)
+                                       [fOpApply('.'
+                                                 [Var fInt(2 unit)]
+                                                 unit)
+                                        fThread(fBoolCase(fOpApply('==' [End fAtom(nil unit)] unit)
+                                                          End
+                                                          fOpApply('.' [End fInt(2 unit)] unit)
+                                                          unit)
+                                                {CoordNoDebug COORDS})
+                                       ]
+                                      )
+                        Both = fRecord(fAtom('#' unit) [Var End])
+                     else
+                        Both = Var
+                        Call = fOpApply('.'
+                                        [Var fInt(2 unit)]
+                                        unit)
+                     end
                      {Aux T Both|Acc V|AccD IsLazy I+1 Dcl|ListDecl Both|ExtraArgs Call|CallItself Cond|Conditions}
                   [] forGeneratorInt(_ Hi St) then Call Cond Var in % Ints style
                      case V
@@ -607,10 +693,23 @@ define
       %% - call WaitNeeded on result.I
       %% - call Value.makeNeeded for every other result.X
       %% - assign LazyVar to unit
-      fun {MakeThreads Result LazyVar Init Fields}
+      fun {MakeThreads Result LazyVar Init Fields Cells}
          local
-            fun {Aux Acc Fs}
-               if Fs == nil then Acc
+            fun {Aux Acc Fs Cs}
+               if Fs == nil then
+                  if Cs == nil then Acc
+                  else Thrd in
+                     Thrd = fThread(
+                               fAnd(
+                                  fApply(
+                                     fVar('WaitNeeded' unit)
+                                     [fAt(Cs.1 unit)]
+                                     unit)
+                                  fEq(LazyVar fAtom(unit unit) unit)
+                                  )
+                               {CoordNoDebug COORDS})
+                     {Aux Thrd|Acc Fs Cs.2}
+                  end
                else Thrd in
                   Thrd = fThread(
                             fAnd(
@@ -621,11 +720,11 @@ define
                                fEq(LazyVar fAtom(unit unit) unit)
                                )
                             {CoordNoDebug COORDS})
-                  {Aux Thrd|Acc Fs.2}
+                  {Aux Thrd|Acc Fs.2 Cs}
                end
             end
          in
-            {Aux Init|nil Fields}
+            {Aux Init|nil Fields Cells}
          end
       end
       %% generates all the levels of the list comprehension recursively
@@ -772,14 +871,19 @@ define
                                      %% true
                                      True
                                      %% false
-                                     if Index == 1 then
+                                     if Index == 1 then Clts in
+                                        %% close collectors
+                                        Clts = {Map CellsCollect
+                                                fun{$ C}
+                                                   fApply(fVar('Exchange' unit) [C fAtom(nil unit) fWildcard(unit)] unit)
+                                                end}
                                         %% first level so assign Result to nil
-                                        {DeclareAll {Map Fields
-                                                     fun{$ F}
-                                                        fEq(fOpApply('.' [Result F] unit)
-                                                            fAtom(nil unit)
-                                                            unit)
-                                                     end}}
+                                        {DeclareAll {Append Clts {Map Fields
+                                                                  fun{$ F}
+                                                                     fEq(fOpApply('.' [Result F] unit)
+                                                                         fAtom(nil unit)
+                                                                         unit)
+                                                                  end}}}
                                      else
                                         %% call previous level
                                         {SwitchResultInPreviousLevelCall CallToPreviousLevel Result}
@@ -795,7 +899,11 @@ define
                                        if Outputs == 1 then
                                           %%=====================
                                           %% lazy with one output
-                                          fApply(fVar('WaitNeeded' unit) [fOpApply('.' [Result Fields.1] unit)] unit)
+                                          if CellsCollect == nil then
+                                             fApply(fVar('WaitNeeded' unit) [fOpApply('.' [Result Fields.1] unit)] unit)
+                                          else
+                                             fApply(fVar('WaitNeeded' unit) [fAt(CellsCollect.1 unit)] unit)
+                                          end
                                        else
                                           %%==========================
                                           %% lazy with several outputs
@@ -805,7 +913,7 @@ define
                                              fLocal(
                                                 LazyVar
                                                 {DeclareAll {MakeThreads Result LazyVar
-                                                             fApply(fVar('Wait' unit) [LazyVar] unit) Fields}}
+                                                             fApply(fVar('Wait' unit) [LazyVar] unit) Fields CellsCollect}}
                                                 unit)
                                           end
                                        end
@@ -837,7 +945,7 @@ define
                              %% body
                              local
                                 NextsRecord
-                                NextsToDecl = {CreateNexts Outputs Fields NextsRecord}
+                                NextsToDecl = {CreateNexts Outputs Fields FieldsCollect CellsCollect NextsRecord}
                                 Decls
                                 Initiators = {NextLevelInitiators FOR_COMPREHENSION_LIST 0 Decls}
                                 Apply = if ReturnList then
@@ -881,7 +989,9 @@ define
       Fields
       Expressions
       Conditions
-      Outputs = {ParseExpressions EXPR_LIST Fields Expressions Conditions}
+      FieldsCollect
+      CellsCollect
+      Outputs = {ParseExpressions EXPR_LIST Fields Expressions Conditions FieldsCollect CellsCollect}
       %% launch the chain of level generation
       PreLevel = {LevelsGenerator}
    in
