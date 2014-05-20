@@ -61,7 +61,7 @@ define
             = rec(a:yes c:yes rec:rec(b:yes))
 
          (A if A > 4 suchthat _:A in r(r1(1 2 3) r2(4 5 6)) if {Label A} == r2)
-            = r(r2(2:5 3:6))
+            = r(2:r2(2:5 3:6))
 
          (F#A suchthat F:A in [1 2 3])
             = (1#1|1#2|1#3|2#nil)
