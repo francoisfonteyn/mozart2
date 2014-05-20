@@ -8,10 +8,10 @@ set(BASE_FUNCTORS
     #"misc.oz" "instruction.oz" "compiler.oz" "except.oz"
     "dictionary.oz" "ofs.oz"
     #"pickles.oz" "unix.oz"
-    "weakdictionary.oz" "thread.oz"
-    #"weakdictionaryGC.oz"
+    "state.oz" "thread.oz"
+    #"weakdictionary.oz" "weakdictionaryGC.oz"
     #"finalize.oz" "gc.oz"
-    "state.oz"
+    "listComprehension.oz" "recordComprehension.oz"
 )
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/base")
 foreach(FUNCTOR ${BASE_FUNCTORS})
@@ -59,7 +59,7 @@ set(FD_FUNCTORS
     #"alpha.oz" "binpacking.oz" "boundsdistinct.oz" "bridge.oz" "bridge_noterm.oz"
     #"buildhouse.oz" "cars.oz" "change.oz" "coins.oz" "college.oz"
     #"color.oz" "conference.oz" "configuration.oz"
-    # "constrdisj.oz" "diagnosis.oz"
+    #"constrdisj.oz" "diagnosis.oz"
     #"distribute.oz" "divmod.oz" "donald.oz" "dsum.oz" "equations.oz"
     #"family.oz" "filter.oz" "fraction.oz" "grocery.oz" "guards.oz" "houses.oz"
     #"hubert.oz" "kalotan.oz" "knights.oz" "magicsequence.oz" "magicsquare.oz"
@@ -92,27 +92,15 @@ foreach(FUNCTOR ${INTERACTIVE_FUNCTORS})
 endforeach()
 # lib folder
 set(LIB_FUNCTORS
-    # "compute-tests.oz" "engine.oz"
+    #"compute-tests.oz" "engine.oz"
     #"failed.oz" "help-bench.oz"
     #"help-string.oz"
-    # "make-bench.oz"
+    #"make-bench.oz"
     #"passed.oz"
 )
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
 foreach(FUNCTOR ${LIB_FUNCTORS})
   set(LIB_FUNCTORS_OZ ${LIB_FUNCTORS_OZ} "/lib/${FUNCTOR}")
-endforeach()
-# list-comprehensions folder
-set(LISTC_FUNCTORS
-    "1_Level_1_Layer.oz" "1_Level_N_Layer.oz" "Body.oz"
-    "Erlang.oz" "From.oz" "Haskell.oz" "Labeled_output.oz"
-    "Lazy.oz" "Miscellaneous.oz" "Multi_Output.oz"
-    "N_Level_1_Layer.oz" "N_Level_N_Layer.oz"
-    "Output_condition.oz" "Python.oz" "Record_generators.oz"
-)
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/list-comprehensions")
-foreach(FUNCTOR ${LISTC_FUNCTORS})
-  set(LISTC_FUNCTORS_OZ ${LISTC_FUNCTORS_OZ} "/list-comprehensions/${FUNCTOR}")
 endforeach()
 # scheduling folder
 set(SCHEDULING_FUNCTORS
@@ -144,9 +132,8 @@ endforeach()
 set(TEST_FUNCTORS ${BASE_FUNCTORS_OZ} ${BENCH_FUNCTORS_OZ}
     ${DP_FUNCTORS_OZ} ${DP_BENCH_FUNCTORS_OZ}
     ${FD_FUNCTORS_OZ} ${FS_FUNCTORS_OZ} ${INTERACTIVE_FUNCTORS_OZ}
-    ${LIB_FUNCTORS_OZ} ${LISTC_FUNCTORS_OZ}
-    ${SCHEDULING_FUNCTORS_OZ} ${SPACE_FUNCTORS_OZ}
-    ${UNIFY_FUNCTORS_OZ})
+    ${LIB_FUNCTORS_OZ} ${SCHEDULING_FUNCTORS_OZ}
+    ${SPACE_FUNCTORS_OZ} ${UNIFY_FUNCTORS_OZ})
 set(TEST_FUNCTORS_OZF "")
 set(TEST_FUNCTORS_WITH_LIB ${TEST_FUNCTORS} ${LIB_FUNCTORS_OZ})
 foreach(FUNCTOR ${TEST_FUNCTORS_WITH_LIB})
