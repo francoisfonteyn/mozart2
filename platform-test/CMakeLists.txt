@@ -8,7 +8,7 @@ set(BASE_FUNCTORS
     #"misc.oz" "instruction.oz" "compiler.oz" "except.oz"
     "dictionary.oz" "ofs.oz"
     #"pickles.oz" "unix.oz"
-    "state.oz" "thread.oz"
+    "state.oz" "thread.oz" "vm.oz"
     #"weakdictionary.oz" "weakdictionaryGC.oz"
     #"finalize.oz" "gc.oz"
     "listComprehension.oz" "recordComprehension.oz"
